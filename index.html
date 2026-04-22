@@ -163,6 +163,7 @@
         <small>左から順に優先されます。同じ要素が重複しないようにしてください。</small> -->
 
         <h2>強化要素の優先順位</h2>
+        <small>左から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
         <ul id="priority-list">
           <li data-key="char">キャラLv</li>
           <li data-key="equip">装備Lv</li>
@@ -170,9 +171,10 @@
           <li data-key="artifact">古代遺物Lv</li>
           <li data-key="beast">幻獣Lv</li>
         </ul>
-        <small>左から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
 
-        <button class="btn" id="calcBtn">計算</button>
+        <div class="form-group">
+          <div class="btn" id="calcBtn" onclick="calculate()">計算</div>
+        </div>
 
         <div id="output" class="result" style="display:none;"></div>
     </div>
@@ -201,11 +203,6 @@
       new Sortable(document.getElementById('priority-list'), {
         animation: 150,
       });
-
-      // 優先順位取得関数を書き換え
-      function getPriorityOrder() {
-        return [...document.querySelectorAll('#priority-list li')].map(li => li.dataset.key);
-      }
 
       // // 優先順位セレクト作成
       // function createPrioritySelects() {
@@ -243,10 +240,13 @@
       }
 
       // 初期化
-      createPrioritySelects();
+      //createPrioritySelects();
 
-      function getPriorityOrder(){
-        return [...document.querySelectorAll('.priority-select')].map(s=>s.value);
+      // function getPriorityOrder(){
+      //   return [...document.querySelectorAll('.priority-select')].map(s=>s.value);
+      // }
+      function getPriorityOrder() {
+        return [...document.querySelectorAll('#priority-list li')].map(li => li.dataset.key);
       }
 
       function calcScore(charLv, equipLv, skillLv, beastLv, artifactLv) {
@@ -354,7 +354,7 @@
       //   return uniq.slice(0,8);
       // }
 
-      document.getElementById('calcBtn').onclick = function(){
+      function calculate(){
         const inp = getInputs();
         const priorityOrder = getPriorityOrder();
 
@@ -430,4 +430,3 @@
     </script>
   </body>
 </html>
-
