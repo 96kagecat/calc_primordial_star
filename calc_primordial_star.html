@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>原初の星計算アプリ</title>
+    <base target="_top">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f2f5;
+        }
+        header {
+            background-color: #fff;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+        .btn {
+            display: block;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 30px;
+            cursor: pointer;
+            border: none;
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 6px;
+            font-weight: 500;
+            letter-spacing: .03em;
+        }
+        .input-field {
+            width: 80%;
+            min-width: 0;
+            padding: 12px 14px;
+            border: 1.5px solid #cfd8dc;
+            border-radius: 7px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: border-color .2s;
+            background: #fff;
+            outline: none;
+        }
+        .input-field:focus {
+            border-color: #007bff;
+            background: #f4faff;
+        }
+        input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+          accent-color: #007bff;
+          margin-right: 6px;
+          vertical-align: middle;
+          cursor: pointer;
+        }
+        input[type="checkbox"]:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .input-field:disabled {
+          background: #e9ecef !important;
+          color: #a0a4aa !important;
+          border-color: #cfd8dc;
+          cursor: not-allowed;
+          opacity: 1;
+        }
+      </style>
+  </head>
+  <body>
+    <header>
+      原初の星計算アプリ
+    </header>
+
+    <div class="content">
+        <div class="form-group">
+          <label>現在原初の星</label>
+          <input class="input-field" type="number" id="currentPoint" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>目標原初の星</label>
+          <input class="input-field" type="number" id="targetPoint" min="1" value="1">
+        </div>
+        <hr>
+        <div class="form-group">
+          <label>キャラLv (現在)</label>
+          <input class="input-field" type="number" id="charLevel" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>装備Lv (現在)</label>
+          <input class="input-field" type="number" id="equipLevel" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>スキルLv (現在)</label>
+          <input class="input-field" type="number" id="skillLevel" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>幻獣Lv (現在)</label>
+          <input class="input-field" type="number" id="beastLevel" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>古代遺物Lv (現在)</label>
+          <input class="input-field" type="number" id="artifactLevel" min="0" value="0">
+        </div>
+        <hr>
+        <div class="form-group">
+          <label>キャラLv 今後上がる予定</label>
+          <input class="input-field" type="number" id="charLevelUpPlan" min="0" value="0">
+        </div>
+
+        <h2>強化要素の優先順位</h2>
+        <div class="priority-box" id="priorityBox"></div>
+        <small>左から順に優先されます。同じ要素が重複しないようにしてください。</small>
+
+        <button class="btn" id="calcBtn">計算</button>
+
+        <div id="output" class="result" style="display:none;"></div>
+    </div>
+    <script>
+      // 要素情報
+      const ELEMENTS = [
+        { key: "char", label: "キャラLv" },
+        { key: "equip", label: "装備Lv" },
+        { key: "skill", label: "スキルLv" },
+        { key: "artifact", label: "古代遺物Lv" },
+        { key: "beast", label: "幻獣Lv" }
+      ];
+      const SCORE = {
+        char: 100,
+        equip: 18,
+        skill: 7,
+        beast: 8,
+        artifact: 33
+      };
+      const DIVISOR = 27;
+      const MAX_TRIAL = 50;
+
+      // 優先順位セレクト作成
+      function createPrioritySelects() {
+        const box = document.getElementById('priorityBox');
+        box.innerHTML = '';
+        for(let i=0;i<ELEMENTS.length;i++){
+          let sel = document.createElement('select');
+          sel.className = 'priority-select';
+          sel.dataset.idx = i;
+          ELEMENTS.forEach(e=>{
+            let opt = document.createElement('option');
+            opt.value = e.key;
+            opt.textContent = e.label;
+            if(i === ELEMENTS.findIndex(el=>el.key===e.key)) opt.selected = true; //デフォルト
+            sel.appendChild(opt);
+          });
+          box.appendChild(sel);
+        }
+        box.addEventListener('change', syncPrioritySelects);
+      }
+
+      // 項目重複防止
+      function syncPrioritySelects() {
+        const selects = [...document.querySelectorAll('.priority-select')];
+        let vals = selects.map(s=>s.value);
+        selects.forEach((sel,idx)=>{
+          Array.from(sel.options).forEach(opt=>{
+            opt.disabled = false;
+            // 他のセレクトと値が被った場合は無効化（自分自身は除く）
+            if(vals.includes(opt.value) && vals[idx] !== opt.value){
+              opt.disabled = true;
+            }
+          });
+        });
+      }
+
+      // 初期化
+      createPrioritySelects();
+
+      function getPriorityOrder(){
+        return [...document.querySelectorAll('.priority-select')].map(s=>s.value);
+      }
+
+      function calcScore(charLv, equipLv, skillLv, beastLv, artifactLv) {
+        return charLv * SCORE.char + equipLv * SCORE.equip +
+              skillLv * SCORE.skill + beastLv * SCORE.beast +
+              artifactLv * SCORE.artifact;
+      }
+
+      function scoreToPoint(score) {
+        return Math.floor(score / DIVISOR);
+      }
+
+      function getInputs() {
+        return {
+          currentPoint: Number(document.getElementById('currentPoint').value),
+          targetPoint: Number(document.getElementById('targetPoint').value),
+          charLevel: Number(document.getElementById('charLevel').value),
+          equipLevel: Number(document.getElementById('equipLevel').value),
+          skillLevel: Number(document.getElementById('skillLevel').value),
+          beastLevel: Number(document.getElementById('beastLevel').value),
+          artifactLevel: Number(document.getElementById('artifactLevel').value),
+          charLevelUpPlan: Number(document.getElementById('charLevelUpPlan').value)
+        };
+      }
+
+      /**
+       * 必要な強化回数を返す（現在値＋キャラLv上昇予定込みでスタート）
+       * @param {number} restScore - 残り必要スコア
+       * @param {string[]} priorityOrder - 強化優先順位
+       * @param {object} baseLevels - 現在の各Lv（キャラは既に上昇予定分加算済みで渡すこと）
+       */
+      function greedyCombination(restScore, priorityOrder, baseLevels) {
+        let result = {};
+        let remain = restScore;
+        // クローンしていじる
+        let levels = Object.assign({}, baseLevels);
+
+        for (let key of priorityOrder) {
+          let cnt = Math.floor(remain / SCORE[key]);
+          // 0未満にはならないように
+          if(cnt < 0) cnt = 0;
+          result[key] = cnt;
+          remain -= cnt * SCORE[key];
+        }
+        result.sum = restScore - remain;
+        return [result];
+      }
+
+      // // 優先順位に従い、ネストループの順番も入れ替える
+      // function generateCombinations(needScore, priorityOrder) {
+      //   let results = [];
+      //   // 優先順
+      //   const keys = priorityOrder;
+      //   // 各要素の最大値
+      //   const maxes = {
+      //     char: Math.ceil(needScore / SCORE.char),
+      //     equip: Math.ceil(needScore / SCORE.equip),
+      //     skill: Math.ceil(needScore / SCORE.skill),
+      //     artifact: Math.ceil(needScore / SCORE.artifact),
+      //     beast: Math.ceil(needScore / SCORE.beast)
+      //   };
+
+      //   // 再帰的に全探索
+      //   function dfs(levels, idx, remainScore) {
+      //     if(idx === keys.length){
+      //       // 1つ以上アップしていて条件を満たすもののみ
+      //       let sumCount = Object.values(levels).reduce((a,b)=>a+b,0);
+      //       let sumScore = calcScore(
+      //         levels.char,
+      //         levels.equip,
+      //         levels.skill,
+      //         levels.beast,
+      //         levels.artifact
+      //       );
+      //       if(sumCount > 0 && sumScore >= needScore && sumScore < needScore + Math.max(...Object.values(SCORE))){
+      //         results.push({ ...levels, sum: sumScore });
+      //       }
+      //       return;
+      //     }
+      //     let key = keys[idx];
+      //     let max = Math.min(maxes[key], MAX_TRIAL);
+      //     for(let i=0;i<=max;i++){
+      //       levels[key] = i;
+      //       dfs(levels, idx+1, remainScore - SCORE[key]*i);
+      //     }
+      //   }
+      //   dfs({char:0,equip:0,skill:0,artifact:0,beast:0}, 0, needScore);
+
+      //   // ソート: 合計スコア→優先項目の小さい順
+      //   results.sort((a,b)=>
+      //     a.sum - b.sum ||
+      //     keys.map(k=>(a[k]-b[k])).find(diff=>diff!==0)
+      //   );
+
+      //   // 重複排除
+      //   let uniq = [];
+      //   let seen = new Set();
+      //   for(const r of results){
+      //     let key = keys.map(k=>r[k]).join(',');
+      //     if(!seen.has(key)){
+      //       uniq.push(r);
+      //       seen.add(key);
+      //     }
+      //   }
+      //   return uniq.slice(0,8);
+      // }
+
+      document.getElementById('calcBtn').onclick = function(){
+        const inp = getInputs();
+        const priorityOrder = getPriorityOrder();
+
+        // --- 1. 現在値 & キャラLv上昇予定込み ---
+        // キャラLvは「現在+上昇予定」で仮想的に進める
+        let baseCharLevel = inp.charLevel + inp.charLevelUpPlan;
+
+        // --- 2. 現在スコア＆原初の星 ----
+        let nowScore = calcScore(inp.charLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
+        let nowPoint = scoreToPoint(nowScore);
+
+        // 「キャラLv上昇予定」込みスコア
+        let planScore = calcScore(baseCharLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
+        let planPoint = scoreToPoint(planScore);
+
+        // 必要原初の星
+        let needPoint = inp.targetPoint - planPoint;
+        document.getElementById('output').style.display = '';
+
+        if (needPoint <= 0) {
+          document.getElementById('output').innerHTML = `<b>目標原初の星は既に達成済みです！</b><br>
+          (キャラLv上昇予定込みで ${planPoint} 原初の星)`;
+          return;
+        }
+
+        // --- 3. 必要スコア(=残り必要値) ---
+        let restScore = (inp.targetPoint * DIVISOR) - planScore;
+        if (restScore <= 0) {
+          document.getElementById('output').innerHTML =
+            '<b>既に目標原初の星を超えています。</b>';
+          return;
+        }
+
+        // --- 4. 今の状態をbaseLevelsとして渡す（キャラは上昇予定込み） ---
+        let baseLevels = {
+          char: baseCharLevel,
+          equip: inp.equipLevel,
+          skill: inp.skillLevel,
+          beast: inp.beastLevel,
+          artifact: inp.artifactLevel
+        };
+
+        // --- 5. greedyCombination は不足分だけ返す ---
+        let combinations = greedyCombination(restScore, priorityOrder, baseLevels);
+
+        // --- 6. 結果の表示 ---
+        let html = `
+          <b>現在原初の星:</b> ${nowPoint}pt<br>
+          <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
+          <b>目標原初の星:</b> ${inp.targetPoint}pt<br>
+          <b>あと${needPoint}原初の星 (${restScore}スコア)必要です。</b><br>
+          <br>
+          <b>優先順位：${priorityOrder.map(k => ELEMENTS.find(e => e.key === k).label).join(' ＞ ')}</b><br>
+          <b>必要な強化組み合わせ例：</b>
+          <ul class="combination-list">
+        `;
+        if (combinations.length === 0) {
+          html += '<li>これ以上小さな組み合わせでは達成できません</li>';
+        } else {
+          combinations.forEach(c => {
+            let desc = [];
+            if (c.char) desc.push(`キャラ+${c.char}`);
+            if (c.equip) desc.push(`装備+${c.equip}`);
+            if (c.skill) desc.push(`スキル+${c.skill}`);
+            if (c.artifact) desc.push(`古代遺物+${c.artifact}`);
+            if (c.beast) desc.push(`幻獣+${c.beast}`);
+            html += `<li>${desc.join('，')} （合計スコア+${c.sum}）</li>`;
+          });
+        }
+        html += '</ul>';
+        document.getElementById('output').innerHTML = html;
+      };
+    </script>
+  </body>
+</html>
