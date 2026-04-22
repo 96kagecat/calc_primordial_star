@@ -158,10 +158,6 @@
           <input class="input-field" type="number" id="charLevelUpPlan" min="0" value="0">
         </div>
 
-        <!-- <h2>強化要素の優先順位</h2>
-        <div class="priority-box" id="priorityBox"></div>
-        <small>左から順に優先されます。同じ要素が重複しないようにしてください。</small> -->
-
         <h2>強化要素の優先順位</h2>
         <small>左から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
         <ul id="priority-list">
@@ -204,47 +200,6 @@
         animation: 150,
       });
 
-      // // 優先順位セレクト作成
-      // function createPrioritySelects() {
-      //   const box = document.getElementById('priorityBox');
-      //   box.innerHTML = '';
-      //   for(let i=0;i<ELEMENTS.length;i++){
-      //     let sel = document.createElement('select');
-      //     sel.className = 'priority-select';
-      //     sel.dataset.idx = i;
-      //     ELEMENTS.forEach(e=>{
-      //       let opt = document.createElement('option');
-      //       opt.value = e.key;
-      //       opt.textContent = e.label;
-      //       if(i === ELEMENTS.findIndex(el=>el.key===e.key)) opt.selected = true; //デフォルト
-      //       sel.appendChild(opt);
-      //     });
-      //     box.appendChild(sel);
-      //   }
-      //   box.addEventListener('change', syncPrioritySelects);
-      // }
-
-      // 項目重複防止
-      function syncPrioritySelects() {
-        const selects = [...document.querySelectorAll('.priority-select')];
-        let vals = selects.map(s=>s.value);
-        selects.forEach((sel,idx)=>{
-          Array.from(sel.options).forEach(opt=>{
-            opt.disabled = false;
-            // 他のセレクトと値が被った場合は無効化（自分自身は除く）
-            if(vals.includes(opt.value) && vals[idx] !== opt.value){
-              opt.disabled = true;
-            }
-          });
-        });
-      }
-
-      // 初期化
-      //createPrioritySelects();
-
-      // function getPriorityOrder(){
-      //   return [...document.querySelectorAll('.priority-select')].map(s=>s.value);
-      // }
       function getPriorityOrder() {
         return [...document.querySelectorAll('#priority-list li')].map(li => li.dataset.key);
       }
@@ -272,105 +227,226 @@
         };
       }
 
-      /**
-       * 必要な強化回数を返す（現在値＋キャラLv上昇予定込みでスタート）
-       * @param {number} restScore - 残り必要スコア
-       * @param {string[]} priorityOrder - 強化優先順位
-       * @param {object} baseLevels - 現在の各Lv（キャラは既に上昇予定分加算済みで渡すこと）
-       */
-      function greedyCombination(restScore, priorityOrder, baseLevels) {
-        let result = {};
-        let remain = restScore;
-        // クローンしていじる
-        let levels = Object.assign({}, baseLevels);
+      function greedyCombination1(restScore, priorityOrder, baseLevels, maxCharLevel) {
+        let current = { ...baseLevels };
+        let increments = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
+        let history = [];
+        let totalIncrease = 0;
 
-        for (let key of priorityOrder) {
-          let cnt = Math.floor(remain / SCORE[key]);
-          // 0未満にはならないように
-          if(cnt < 0) cnt = 0;
-          result[key] = cnt;
-          remain -= cnt * SCORE[key];
+        // 途中経過保存用
+        let prevScore = calcScore(
+          current.char,
+          current.equip,
+          current.skill,
+          current.beast,
+          current.artifact
+        );
+
+        while (restScore > 0) {
+          let updated = false;
+          for (let key of priorityOrder) {
+            // レベル制限：キャラLvは上限まで
+            if (key === "char" && current.char >= maxCharLevel) continue;
+
+            // 1段階強化
+            current[key]++;
+            let newScore = calcScore(
+              current.char,
+              current.equip,
+              current.skill,
+              current.beast,
+              current.artifact
+            );
+            let diff = newScore - prevScore;
+
+            if (diff <= 0) {
+              current[key]--;
+              continue;
+            }
+
+            increments[key]++;
+            restScore -= diff;
+            totalIncrease += diff;
+
+            // 履歴保存（この時点で達成していたら記録）
+            history.push({
+              char: increments.char,
+              equip: increments.equip,
+              skill: increments.skill,
+              beast: increments.beast,
+              artifact: increments.artifact,
+              sum: totalIncrease
+            });
+
+            prevScore = newScore;
+
+            updated = true;
+            if (restScore <= 0) break;
+          }
+          if (!updated) break;
         }
-        result.sum = restScore - remain;
-        return [result];
+
+        // 達成した案のみ抽出（必要スコアを超えたもの）
+        return history.filter(h => h.sum >= totalIncrease);
       }
 
-      // // 優先順位に従い、ネストループの順番も入れ替える
-      // function generateCombinations(needScore, priorityOrder) {
-      //   let results = [];
-      //   // 優先順
-      //   const keys = priorityOrder;
-      //   // 各要素の最大値
-      //   const maxes = {
-      //     char: Math.ceil(needScore / SCORE.char),
-      //     equip: Math.ceil(needScore / SCORE.equip),
-      //     skill: Math.ceil(needScore / SCORE.skill),
-      //     artifact: Math.ceil(needScore / SCORE.artifact),
-      //     beast: Math.ceil(needScore / SCORE.beast)
-      //   };
+      function multiCombination(restScore, priorityOrder, baseLevels, maxCharLevel, maxDepth=10) {
+        let results = [];
+        let initial = { ...baseLevels };
+        let increments = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
 
-      //   // 再帰的に全探索
-      //   function dfs(levels, idx, remainScore) {
-      //     if(idx === keys.length){
-      //       // 1つ以上アップしていて条件を満たすもののみ
-      //       let sumCount = Object.values(levels).reduce((a,b)=>a+b,0);
-      //       let sumScore = calcScore(
-      //         levels.char,
-      //         levels.equip,
-      //         levels.skill,
-      //         levels.beast,
-      //         levels.artifact
-      //       );
-      //       if(sumCount > 0 && sumScore >= needScore && sumScore < needScore + Math.max(...Object.values(SCORE))){
-      //         results.push({ ...levels, sum: sumScore });
-      //       }
-      //       return;
-      //     }
-      //     let key = keys[idx];
-      //     let max = Math.min(maxes[key], MAX_TRIAL);
-      //     for(let i=0;i<=max;i++){
-      //       levels[key] = i;
-      //       dfs(levels, idx+1, remainScore - SCORE[key]*i);
-      //     }
-      //   }
-      //   dfs({char:0,equip:0,skill:0,artifact:0,beast:0}, 0, needScore);
+        function dfs(current, add, rest, prevScore, depth) {
+          if (rest <= 0) {
+            // 必要スコア超えたら結果保存
+            results.push({ ...add, sum: prevScore - startScore });
+            return;
+          }
+          if (depth >= maxDepth) return; // 深さ制限（無限ループ防止）
 
-      //   // ソート: 合計スコア→優先項目の小さい順
-      //   results.sort((a,b)=>
-      //     a.sum - b.sum ||
-      //     keys.map(k=>(a[k]-b[k])).find(diff=>diff!==0)
-      //   );
+          for (let key of priorityOrder) {
+            if (key === "char" && current.char >= maxCharLevel) continue;
 
-      //   // 重複排除
-      //   let uniq = [];
-      //   let seen = new Set();
-      //   for(const r of results){
-      //     let key = keys.map(k=>r[k]).join(',');
-      //     if(!seen.has(key)){
-      //       uniq.push(r);
-      //       seen.add(key);
-      //     }
-      //   }
-      //   return uniq.slice(0,8);
-      // }
+            current[key]++;
+            add[key]++;
+            let newScore = calcScore(
+              current.char,
+              current.equip,
+              current.skill,
+              current.beast,
+              current.artifact
+            );
+            let diff = newScore - prevScore;
+            if (diff > 0) {
+              dfs(current, add, rest - diff, newScore, depth+1);
+            }
+            current[key]--;
+            add[key]--;
+          }
+        }
+
+        const startScore = calcScore(
+          initial.char,
+          initial.equip,
+          initial.skill,
+          initial.beast,
+          initial.artifact
+        );
+
+        dfs(initial, {...increments}, restScore, startScore, 0);
+
+        // 重複排除＆必要スコア以上のみ
+        let filtered = results.filter(r => r.sum >= restScore)
+          .map(r => JSON.stringify(r));
+        // 重複削除
+        filtered = Array.from(new Set(filtered)).map(s => JSON.parse(s));
+
+        // 合計値で昇順ソート
+        filtered.sort((a,b)=>a.sum-b.sum);
+
+        return filtered.slice(0, 10);
+      }
+
+
+      function multiCombinationSplit(restScore, priorityOrder, baseLevels, maxCharLevel, maxDepth=20) {
+        let middleStates = [];
+        // 前半DFS
+        function dfs1(current, add, rest, prevScore, depth) {
+          if (depth === 10) {
+            middleStates.push({current: {...current}, add: {...add}, rest, prevScore});
+            return;
+          }
+          for (let key of priorityOrder) {
+            if (key === "char" && current.char >= maxCharLevel) continue;
+            current[key]++;
+            add[key]++;
+            let newScore = calcScore(
+              current.char,
+              current.equip,
+              current.skill,
+              current.beast,
+              current.artifact
+            );
+            let diff = newScore - prevScore;
+            if (diff > 0) {
+              dfs1(current, add, rest - diff, newScore, depth+1);
+            }
+            current[key]--;
+            add[key]--;
+          }
+        }
+
+        const startScore = calcScore(
+          baseLevels.char,
+          baseLevels.equip,
+          baseLevels.skill,
+          baseLevels.beast,
+          baseLevels.artifact
+        );
+        dfs1({...baseLevels}, {char:0,equip:0,skill:0,beast:0,artifact:0}, restScore, startScore, 0);
+
+        // 後半DFS
+        let results = [];
+        function dfs2(current, add, rest, prevScore, depth) {
+          if (rest <= 0) {
+            results.push({ ...add, sum: prevScore - startScore });
+            return;
+          }
+          if (depth >= 10) return; // ここは10（10+10=20）
+
+          for (let key of priorityOrder) {
+            if (key === "char" && current.char >= maxCharLevel) continue;
+            current[key]++;
+            add[key]++;
+            let newScore = calcScore(
+              current.char,
+              current.equip,
+              current.skill,
+              current.beast,
+              current.artifact
+            );
+            let diff = newScore - prevScore;
+            if (diff > 0) {
+              dfs2(current, add, rest - diff, newScore, depth+1);
+            }
+            current[key]--;
+            add[key]--;
+          }
+        }
+
+        for (let mid of middleStates) {
+          dfs2(
+            {...mid.current},
+            {...mid.add}, // ←addも引き継ぐ
+            mid.rest,
+            mid.prevScore,
+            0
+          );
+        }
+
+        // 重複排除＆必要スコア以上のみ
+        let filtered = results.filter(r => r.sum >= restScore)
+          .map(r => JSON.stringify(r));
+        filtered = Array.from(new Set(filtered)).map(s => JSON.parse(s));
+
+        filtered.sort((a,b)=>a.sum-b.sum);
+
+        return filtered.slice(0, 10);
+      }
+
+
+
 
       function calculate(){
         const inp = getInputs();
         const priorityOrder = getPriorityOrder();
 
-        // --- 1. 現在値 & キャラLv上昇予定込み ---
-        // キャラLvは「現在+上昇予定」で仮想的に進める
         let baseCharLevel = inp.charLevel + inp.charLevelUpPlan;
-
-        // --- 2. 現在スコア＆原初の星 ----
         let nowScore = calcScore(inp.charLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
         let nowPoint = scoreToPoint(nowScore);
 
-        // 「キャラLv上昇予定」込みスコア
         let planScore = calcScore(baseCharLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
         let planPoint = scoreToPoint(planScore);
 
-        // 必要原初の星
         let needPoint = inp.targetPoint - planPoint;
         document.getElementById('output').style.display = '';
 
@@ -380,7 +456,6 @@
           return;
         }
 
-        // --- 3. 必要スコア(=残り必要値) ---
         let restScore = (inp.targetPoint * DIVISOR) - planScore;
         if (restScore <= 0) {
           document.getElementById('output').innerHTML =
@@ -388,7 +463,6 @@
           return;
         }
 
-        // --- 4. 今の状態をbaseLevelsとして渡す（キャラは上昇予定込み） ---
         let baseLevels = {
           char: baseCharLevel,
           equip: inp.equipLevel,
@@ -397,10 +471,15 @@
           artifact: inp.artifactLevel
         };
 
-        // --- 5. greedyCombination は不足分だけ返す ---
-        let combinations = greedyCombination(restScore, priorityOrder, baseLevels);
+        // 最大キャラLv制限
+        const maxCharLevel = baseCharLevel;
 
-        // --- 6. 結果の表示 ---
+        // 複数案取得
+        let combinations = multiCombination(restScore, priorityOrder, baseLevels, maxCharLevel);
+        if (combinations.length === 0) {
+          combinations = greedyCombination1(restScore, priorityOrder, baseLevels, maxCharLevel);
+        }
+        // --- 結果の表示 ---
         let html = `
           <b>現在原初の星:</b> ${nowPoint}pt<br>
           <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
@@ -414,7 +493,7 @@
         if (combinations.length === 0) {
           html += '<li>これ以上小さな組み合わせでは達成できません</li>';
         } else {
-          combinations.forEach(c => {
+          combinations.forEach((c, idx) => {
             let desc = [];
             if (c.char) desc.push(`キャラ+${c.char}`);
             if (c.equip) desc.push(`装備+${c.equip}`);
@@ -426,7 +505,8 @@
         }
         html += '</ul>';
         document.getElementById('output').innerHTML = html;
-      };
+      }
     </script>
   </body>
 </html>
+
