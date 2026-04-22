@@ -96,6 +96,25 @@
           cursor: not-allowed;
           opacity: 1;
         }
+        /* 優先順位リスト用スタイル */
+        #priority-list {
+          display: flex;
+          flex-direction: row;
+          gap: 8px;
+          padding: 0;
+          margin-bottom: 10px;
+        }
+        #priority-list li {
+          background: #e3e9f5;
+          border: 1.5px solid #90b4ff;
+          border-radius: 7px;
+          padding: 8px 18px;
+          font-size: 15px;
+          cursor: grab;
+          list-style: none;
+          font-weight: bold;
+          user-select: none;
+        }
       </style>
   </head>
   <body>
@@ -139,14 +158,26 @@
           <input class="input-field" type="number" id="charLevelUpPlan" min="0" value="0">
         </div>
 
-        <h2>強化要素の優先順位</h2>
+        <!-- <h2>強化要素の優先順位</h2>
         <div class="priority-box" id="priorityBox"></div>
-        <small>左から順に優先されます。同じ要素が重複しないようにしてください。</small>
+        <small>左から順に優先されます。同じ要素が重複しないようにしてください。</small> -->
+
+        <h2>強化要素の優先順位</h2>
+        <ul id="priority-list">
+          <li data-key="char">キャラLv</li>
+          <li data-key="equip">装備Lv</li>
+          <li data-key="skill">スキルLv</li>
+          <li data-key="artifact">古代遺物Lv</li>
+          <li data-key="beast">幻獣Lv</li>
+        </ul>
+        <small>左から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
 
         <button class="btn" id="calcBtn">計算</button>
 
         <div id="output" class="result" style="display:none;"></div>
     </div>
+    <!-- SortableJS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
       // 要素情報
       const ELEMENTS = [
@@ -166,25 +197,35 @@
       const DIVISOR = 27;
       const MAX_TRIAL = 50;
 
-      // 優先順位セレクト作成
-      function createPrioritySelects() {
-        const box = document.getElementById('priorityBox');
-        box.innerHTML = '';
-        for(let i=0;i<ELEMENTS.length;i++){
-          let sel = document.createElement('select');
-          sel.className = 'priority-select';
-          sel.dataset.idx = i;
-          ELEMENTS.forEach(e=>{
-            let opt = document.createElement('option');
-            opt.value = e.key;
-            opt.textContent = e.label;
-            if(i === ELEMENTS.findIndex(el=>el.key===e.key)) opt.selected = true; //デフォルト
-            sel.appendChild(opt);
-          });
-          box.appendChild(sel);
-        }
-        box.addEventListener('change', syncPrioritySelects);
+      // ドラッグ＆ドロップ初期化
+      new Sortable(document.getElementById('priority-list'), {
+        animation: 150,
+      });
+
+      // 優先順位取得関数を書き換え
+      function getPriorityOrder() {
+        return [...document.querySelectorAll('#priority-list li')].map(li => li.dataset.key);
       }
+
+      // // 優先順位セレクト作成
+      // function createPrioritySelects() {
+      //   const box = document.getElementById('priorityBox');
+      //   box.innerHTML = '';
+      //   for(let i=0;i<ELEMENTS.length;i++){
+      //     let sel = document.createElement('select');
+      //     sel.className = 'priority-select';
+      //     sel.dataset.idx = i;
+      //     ELEMENTS.forEach(e=>{
+      //       let opt = document.createElement('option');
+      //       opt.value = e.key;
+      //       opt.textContent = e.label;
+      //       if(i === ELEMENTS.findIndex(el=>el.key===e.key)) opt.selected = true; //デフォルト
+      //       sel.appendChild(opt);
+      //     });
+      //     box.appendChild(sel);
+      //   }
+      //   box.addEventListener('change', syncPrioritySelects);
+      // }
 
       // 項目重複防止
       function syncPrioritySelects() {
@@ -389,3 +430,4 @@
     </script>
   </body>
 </html>
+
