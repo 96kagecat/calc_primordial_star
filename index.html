@@ -12,8 +12,8 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow: auto;
             background-color: #f0f2f5;
         }
         header {
@@ -31,6 +31,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 30px;
+            padding-bottom: 80px;
         }
 
         .btn {
@@ -351,135 +352,6 @@
         };
       }
 
-
-      // 貪欲法
-      function multiCombinationGreedy(
-        restScore, priorityOrder, baseLevels, maxCharLevel, enable ) {
-        const result = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
-        let currentLevels = { ...baseLevels };
-        let startScore = calcScore(
-          baseLevels.char,
-          baseLevels.equip,
-          baseLevels.skill,
-          baseLevels.beast,
-          baseLevels.artifact
-        );
-        let curScore = startScore;
-        const MAX_LEVEL = 50;
-
-        while (curScore - startScore < restScore) {
-          let improved = false;
-          for (const key of priorityOrder) {
-            if (!enable[key]) continue;
-            // 上限チェック
-            if (
-              (key === "char" && currentLevels.char < maxCharLevel) ||
-              (key !== "char" && currentLevels[key] < MAX_LEVEL)
-            ) {
-              currentLevels[key]++;
-              let newScore = calcScore(
-                currentLevels.char,
-                currentLevels.equip,
-                currentLevels.skill,
-                currentLevels.beast,
-                currentLevels.artifact
-              );
-              if (newScore > curScore) {
-                result[key]++;
-                curScore = newScore;
-                improved = true;
-                break; // 優先度順なので一つずつ
-              } else {
-                currentLevels[key]--; // 戻す
-              }
-            }
-          }
-          if (!improved) break; // どれも上げられないなら終了
-        }
-
-        result.sum = curScore - startScore;
-        return [result];
-      }
-
-      // 幅優先探索
-      function multiCombinationBFS(
-        restScore, priorityOrder, baseLevels, maxCharLevel, enable,
-        maxStep = 500,
-        maxResult = 1000
-      ) {
-        const queue = [];
-        const visited = new Map();
-        const results = [];
-
-        queue.push({
-          levels: {...baseLevels},
-          adds: {char:0,equip:0,skill:0,beast:0,artifact:0},
-          sum: 0,
-          step: 0
-        });
-
-        const startScore = calcScore(
-          baseLevels.char,
-          baseLevels.equip,
-          baseLevels.skill,
-          baseLevels.beast,
-          baseLevels.artifact
-        );
-
-        while (queue.length > 0 && results.length < maxResult) {
-          const curr = queue.shift();
-
-          if (curr.sum >= restScore) {
-            results.push({...curr.adds, sum: curr.sum});
-            continue;
-          }
-          if (curr.step >= maxStep) continue;
-
-          for (let key of priorityOrder) {
-            if (!enable[key]) continue;
-            if (key === "char" && curr.levels.char >= maxCharLevel) continue;
-            let nextLevels = {...curr.levels};
-            let nextAdds = {...curr.adds};
-            nextLevels[key]++;
-            nextAdds[key]++;
-            let newScore = calcScore(
-              nextLevels.char,
-              nextLevels.equip,
-              nextLevels.skill,
-              nextLevels.beast,
-              nextLevels.artifact
-            );
-            let diff = newScore - (startScore + curr.sum);
-
-            if (diff >= 0) {
-              const stateKey = `${nextLevels.char},${nextLevels.equip},${nextLevels.skill},${nextLevels.beast},${nextLevels.artifact},${curr.step+1}`;
-
-              if (!visited.has(stateKey) || visited.get(stateKey) > curr.sum + diff) {
-                visited.set(stateKey, curr.sum + diff);
-                queue.push({
-                  levels: nextLevels,
-                  adds: nextAdds,
-                  sum: curr.sum + diff,
-                  step: curr.step + 1
-                });
-              }
-            }
-          }
-        }
-
-        // results.sort((a,b)=>a.sum-b.sum);
-        results.sort((a, b) => {
-          if (a.sum !== b.sum) return a.sum - b.sum;
-          // ここから優先度順比較
-          for (const key of priorityOrder) {
-            if (b[key] !== a[key]) return b[key] - a[key]; // 多い方を上に
-          }
-          return 0;
-        });
-        return results.slice(0, 10);
-      }
-
-
       // 全探索
       function multiCombinationBruteForce(
         restScore, priorityOrder, baseLevels, maxCharLevel, enable) {
@@ -532,11 +404,89 @@
           }
         }
 
+        return results;
+      }
+
+      // 貪欲法
+      function multiCombinationGreedy(
+        restScore, priorityOrder, baseLevels, maxCharLevel, enable
+      ) {
+        const result = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
+        let currentLevels = { ...baseLevels };
+        let startScore = calcScore(
+          baseLevels.char,
+          baseLevels.equip,
+          baseLevels.skill,
+          baseLevels.beast,
+          baseLevels.artifact
+        );
+        let curScore = startScore;
+        const MAX_LEVEL = 100;
+
+        while (curScore - startScore < restScore) {
+          let improved = false;
+          for (const key of priorityOrder) {
+            if (!enable[key]) continue;
+            // 上限チェック
+            if (
+              (key === "char" && currentLevels.char < maxCharLevel) ||
+              (key !== "char" && currentLevels[key] < MAX_LEVEL)
+            ) {
+              currentLevels[key]++;
+              let newScore = calcScore(
+                currentLevels.char,
+                currentLevels.equip,
+                currentLevels.skill,
+                currentLevels.beast,
+                currentLevels.artifact
+              );
+              if (newScore > curScore) {
+                result[key]++;
+                curScore = newScore;
+                improved = true;
+                break; // 優先度順なので一つずつ
+              } else {
+                currentLevels[key]--; // 戻す
+              }
+            }
+          }
+          if (!improved) break; // どれも上げられないなら終了
+        }
+
+        result.sum = curScore - startScore;
+        return result; // ←配列でなくオブジェクト単体を返す
+      }
+
+      // 複数パターンをまとめて返すラッパー関数
+      function multiCombinationGreedyVariants(
+        restScore, priorityOrders, baseLevels, maxCharLevel, enable
+      ) {
+        // priorityOrdersは配列（複数パターン）
+        const results = [];
+        for (const priorityOrder of priorityOrders) {
+          const r = multiCombinationGreedy(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
+          results.push(r);
+        }
+        return results;
+      }
+
+      function permutations(arr) {
+        if (arr.length === 1) return [arr];
+        let result = [];
+        for (let i = 0; i < arr.length; i++) {
+          const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+          for (const perm of permutations(rest)) {
+            result.push([arr[i], ...perm]);
+          }
+        }
+        return result;
+      }
+
+      // 結果をソートして10件にする
+      function combinationsSort(combinations, priorityOrder){
         // 優先度降順ソート＋スコア昇順
-        results.sort((a, b) => {
-          // まずスコア（diff, sum）の昇順
+        combinations.sort((a, b) => {
           if (a.sum !== b.sum) return a.sum - b.sum;
-          // スコアが等しい場合はpriorityOrder順に比較
           for (const key of priorityOrder) {
             if ((b[key] || 0) !== (a[key] || 0)) {
               return (b[key] || 0) - (a[key] || 0);
@@ -544,8 +494,18 @@
           }
           return 0;
         });
-        return results.slice(0, 10);
+        // 重複を削除
+        const seen = new Set();
+        combinations = combinations.filter(c => {
+          const key = priorityOrder.map(k => c[k] || 0).join("-");
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        combinations = combinations.slice(0, 10);
+        return combinations;
       }
+
 
       function showLoading(show) {
         const btn = document.getElementById('calcBtn');
@@ -594,6 +554,12 @@
           (キャラLv上昇予定込みで ${planPoint} 原初の星)`;
           return;
         }
+        if (needPoint > 500){
+          document.getElementById('output').style.display = '';
+          document.getElementById('output').innerHTML =
+            `<span style="color:#d32f2f;font-weight:bold;">原初の星の差は500以下になるように入力してください。</span>`;
+          return;
+        }
 
         let restScore = needPoint * DIVISOR;
         if (restScore <= 0) {
@@ -631,16 +597,18 @@
 
         // 強化案取得
         let combinations = [];
-        if(needPoint < 100){
+        if(needPoint < 200){
           // 全探索は原初の星100未満のみ
           combinations = multiCombinationBruteForce(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
         }
         if (combinations.length === 0) {
           // BruteForceで見つからなかった場合はGreedyとBFSで探索
-          let combinationsB = multiCombinationGreedy(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
-          let combinationsA = multiCombinationBFS(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
-          combinations = [...combinationsB, ...combinationsA];
+          const orders = permutations(priorityOrder);
+          combinations = multiCombinationGreedyVariants(restScore, orders, baseLevels, maxCharLevel, enable);
         }
+
+        // 結果をソート
+        combinations = combinationsSort(combinations, priorityOrder);
 
         // --- 結果の表示 ---
         // <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
@@ -681,3 +649,4 @@
     </script>
   </body>
 </html>
+
