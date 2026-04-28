@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>原初の星計算アプリ</title>
+    <title>原初の星計算アプリβ</title>
     <base target="_top">
     <style>
         body {
@@ -32,23 +32,34 @@
             overflow-y: auto;
             padding: 30px;
         }
+
         .btn {
-            display: block;
-            background-color: #007bff;
-            color: white;
-            text-align: center;
-            padding: 10px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-weight: bold;
-            margin-top: 30px;
-            cursor: pointer;
-            border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #007bff;
+          color: white;
+          text-align: center;
+          padding: 10px;
+          border-radius: 10px;
+          text-decoration: none;
+          font-weight: bold;
+          margin-top: 30px;
+          cursor: pointer;
+          border: none;
+          min-height: 16px;
+          position: relative;
         }
-        .btn:disabled {
-            opacity: 0.6;
-            pointer-events: none;
+        #calcBtnText, #calcBtnLoader {
+          transition: opacity 0.15s;
         }
+        #calcBtnText.hide,
+        #calcBtnLoader.hide {
+          opacity: 0;
+          visibility: hidden;
+          position: absolute;
+        }
+
         .form-group {
             margin-bottom: 18px;
         }
@@ -76,6 +87,22 @@
             border-color: #007bff;
             background: #f4faff;
         }
+
+        #enhance-checkboxes {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          align-items: center;
+          margin-bottom: 22px;
+        }
+
+        #enhance-checkboxes label {
+          margin-bottom: 0;
+          font-size: 15px;
+          font-weight: 500;
+          color: #333;
+        }
+
         input[type="checkbox"] {
           width: 20px;
           height: 20px;
@@ -96,42 +123,107 @@
           cursor: not-allowed;
           opacity: 1;
         }
+
         /* 優先順位リスト用スタイル */
         #priority-list {
           display: flex;
-          flex-direction: row;
+          flex-direction: column;
           gap: 8px;
           padding: 0;
           margin-bottom: 10px;
+          width: 240px;
+          counter-reset: item;
         }
         #priority-list li {
           background: #e3e9f5;
           border: 1.5px solid #90b4ff;
           border-radius: 7px;
-          padding: 8px 18px;
+          padding: 10px 18px 10px 40px;
           font-size: 15px;
           cursor: grab;
           list-style: none;
           font-weight: bold;
           user-select: none;
+          position: relative;
+          min-height: 32px;
+          display: flex;
+          align-items: center;
+        }
+        #priority-list li::before {
+          content: counter(item) " ";
+          counter-increment: item;
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: #007bff;
+          color: #fff;
+          border-radius: 50%;
+          width: 22px;
+          height: 22px;
+          text-align: center;
+          line-height: 22px;
+          font-size: 13px;
+          font-weight: bold;
+        }
+
+        /* 強化結果テーブル用スタイル */
+        .result table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 10px 0;
+          background: #fff;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+          font-size: 15px;
+        }
+        .result th,
+        .result td {
+          border: 1px solid #cfd8dc;
+          padding: 10px 14px;
+          text-align: center;
+        }
+        .result th {
+          background: #e3e9f5;
+          color: #374151;
+          font-weight: bold;
+          letter-spacing: .05em;
+        }
+        .result tr:nth-child(even) td {
+          background: #f8fafc;
+        }
+        .result tr:hover td {
+          background: #e7f1ff;
+          transition: background .2s;
+        }
+        .result td {
+          color: #393939;
+        }
+
+        /* ローディングアイコンアニメ */
+        #calcBtnLoader svg {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          100% { transform: rotate(360deg); }
         }
       </style>
   </head>
   <body>
     <header>
-      原初の星計算アプリ
+      原初の星計算アプリβ
     </header>
 
     <div class="content">
+      <h3>原初の星</h3>
         <div class="form-group">
-          <label>現在原初の星</label>
+          <label>現在値</label>
           <input class="input-field" type="number" id="currentPoint" min="0" value="0">
         </div>
         <div class="form-group">
-          <label>目標原初の星</label>
+          <label>目標値</label>
           <input class="input-field" type="number" id="targetPoint" min="1" value="1">
         </div>
-        <hr>
+        <!-- <hr>
         <div class="form-group">
           <label>キャラLv (現在)</label>
           <input class="input-field" type="number" id="charLevel" min="0" value="0">
@@ -156,24 +248,37 @@
         <div class="form-group">
           <label>キャラLv 今後上がる予定</label>
           <input class="input-field" type="number" id="charLevelUpPlan" min="0" value="0">
+        </div>-->
+        <h3>強化項目</h3>
+        <div id="enhance-checkboxes" class="form-group">
+          <label><input type="checkbox" data-key="equip" checked> 装備</label>
+          <label><input type="checkbox" data-key="skill" checked> スキル</label>
+          <label><input type="checkbox" data-key="beast" checked> 幻獣</label>
+          <label><input type="checkbox" data-key="artifact" checked> 古代遺物</label>
         </div>
 
-        <h2>強化要素の優先順位</h2>
-        <small>左から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
+        <h3>優先順位</h3>
+        <small>上から順に優先されます。ドラッグ＆ドロップで並び替えてください。</small>
         <ul id="priority-list">
-          <li data-key="char">キャラLv</li>
-          <li data-key="equip">装備Lv</li>
-          <li data-key="skill">スキルLv</li>
-          <li data-key="artifact">古代遺物Lv</li>
-          <li data-key="beast">幻獣Lv</li>
+          <li data-key="equip">装備</li>
+          <li data-key="skill">スキル</li>
+          <li data-key="beast">幻獣</li>
+          <li data-key="artifact">古代遺物</li>
         </ul>
 
-        <div class="form-group">
-          <div class="btn" id="calcBtn" onclick="calculate()">計算</div>
+        <div class="btn" id="calcBtn" onclick="clickCalcBtn()" type="button">
+          <span id="calcBtnText">計算</span>
+          <span id="calcBtnLoader" class="hide">
+            <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="16" stroke="#fff" stroke-width="5" opacity="0.25"/>
+              <path d="M36 20a16 16 0 01-16 16" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+            </svg>
+          </span>
         </div>
 
         <div id="output" class="result" style="display:none;"></div>
     </div>
+
     <!-- SortableJS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
@@ -193,7 +298,6 @@
         artifact: 28
       };
       const DIVISOR = 7;
-      const MAX_TRIAL = 50;
 
       // ドラッグ＆ドロップ初期化
       new Sortable(document.getElementById('priority-list'), {
@@ -214,166 +318,105 @@
         return Math.floor(score / DIVISOR);
       }
 
+      function getEnhanceEnable() {
+        // key: true/false
+        const checkboxes = document.querySelectorAll('#enhance-checkboxes input[type=checkbox]');
+        const obj = {};
+        checkboxes.forEach(cb => {
+          obj[cb.dataset.key] = cb.checked;
+        });
+        return obj;
+      }
+
       function getInputs() {
+        // return {
+        //   currentPoint: Number(document.getElementById('currentPoint').value),
+        //   targetPoint: Number(document.getElementById('targetPoint').value),
+        //   charLevel: Number(document.getElementById('charLevel').value),
+        //   equipLevel: Number(document.getElementById('equipLevel').value),
+        //   skillLevel: Number(document.getElementById('skillLevel').value),
+        //   beastLevel: Number(document.getElementById('beastLevel').value),
+        //   artifactLevel: Number(document.getElementById('artifactLevel').value),
+        //   charLevelUpPlan: Number(document.getElementById('charLevelUpPlan').value)
+        // };
         return {
           currentPoint: Number(document.getElementById('currentPoint').value),
           targetPoint: Number(document.getElementById('targetPoint').value),
-          charLevel: Number(document.getElementById('charLevel').value),
-          equipLevel: Number(document.getElementById('equipLevel').value),
-          skillLevel: Number(document.getElementById('skillLevel').value),
-          beastLevel: Number(document.getElementById('beastLevel').value),
-          artifactLevel: Number(document.getElementById('artifactLevel').value),
-          charLevelUpPlan: Number(document.getElementById('charLevelUpPlan').value)
+          charLevel: 0,
+          equipLevel: 0,
+          skillLevel: 0,
+          beastLevel: 0,
+          artifactLevel: 0,
+          charLevelUpPlan: 0
         };
       }
 
-      function greedyCombination1(restScore, priorityOrder, baseLevels, maxCharLevel) {
-        let current = { ...baseLevels };
-        let increments = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
-        let history = [];
-        let totalIncrease = 0;
 
-        // 途中経過保存用
-        let prevScore = calcScore(
-          current.char,
-          current.equip,
-          current.skill,
-          current.beast,
-          current.artifact
+      // 貪欲法
+      function multiCombinationGreedy(
+        restScore, priorityOrder, baseLevels, maxCharLevel, enable ) {
+        const result = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
+        let currentLevels = { ...baseLevels };
+        let startScore = calcScore(
+          baseLevels.char,
+          baseLevels.equip,
+          baseLevels.skill,
+          baseLevels.beast,
+          baseLevels.artifact
         );
+        let curScore = startScore;
+        const MAX_LEVEL = 50;
 
-        while (restScore > 0) {
-          let updated = false;
-          for (let key of priorityOrder) {
-            // レベル制限：キャラLvは上限まで
-            if (key === "char" && current.char >= maxCharLevel) continue;
-
-            // 1段階強化
-            current[key]++;
-            let newScore = calcScore(
-              current.char,
-              current.equip,
-              current.skill,
-              current.beast,
-              current.artifact
-            );
-            let diff = newScore - prevScore;
-
-            if (diff <= 0) {
-              current[key]--;
-              continue;
+        while (curScore - startScore < restScore) {
+          let improved = false;
+          for (const key of priorityOrder) {
+            if (!enable[key]) continue;
+            // 上限チェック
+            if (
+              (key === "char" && currentLevels.char < maxCharLevel) ||
+              (key !== "char" && currentLevels[key] < MAX_LEVEL)
+            ) {
+              currentLevels[key]++;
+              let newScore = calcScore(
+                currentLevels.char,
+                currentLevels.equip,
+                currentLevels.skill,
+                currentLevels.beast,
+                currentLevels.artifact
+              );
+              if (newScore > curScore) {
+                result[key]++;
+                curScore = newScore;
+                improved = true;
+                break; // 優先度順なので一つずつ
+              } else {
+                currentLevels[key]--; // 戻す
+              }
             }
-
-            increments[key]++;
-            restScore -= diff;
-            totalIncrease += diff;
-
-            // 履歴保存（この時点で達成していたら記録）
-            history.push({
-              char: increments.char,
-              equip: increments.equip,
-              skill: increments.skill,
-              beast: increments.beast,
-              artifact: increments.artifact,
-              sum: totalIncrease
-            });
-
-            prevScore = newScore;
-
-            updated = true;
-            if (restScore <= 0) break;
           }
-          if (!updated) break;
+          if (!improved) break; // どれも上げられないなら終了
         }
 
-        // 達成した案のみ抽出（必要スコアを超えたもの）
-        return history.filter(h => h.sum >= totalIncrease);
+        result.sum = curScore - startScore;
+        return [result];
       }
 
-      function multiCombination(restScore, priorityOrder, baseLevels, maxCharLevel, maxDepth=10) {
-        let results = [];
-        let initial = { ...baseLevels };
-        let increments = { char: 0, equip: 0, skill: 0, beast: 0, artifact: 0 };
+      // 幅優先探索
+      function multiCombinationBFS(
+        restScore, priorityOrder, baseLevels, maxCharLevel, enable,
+        maxStep = 500,
+        maxResult = 1000
+      ) {
+        const queue = [];
+        const visited = new Map();
+        const results = [];
 
-        function dfs(current, add, rest, prevScore, depth) {
-          if (rest <= 0) {
-            // 必要スコア超えたら結果保存
-            results.push({ ...add, sum: prevScore - startScore });
-            return;
-          }
-          if (depth >= maxDepth) return; // 深さ制限（無限ループ防止）
-
-          for (let key of priorityOrder) {
-            if (key === "char" && current.char >= maxCharLevel) continue;
-
-            current[key]++;
-            add[key]++;
-            let newScore = calcScore(
-              current.char,
-              current.equip,
-              current.skill,
-              current.beast,
-              current.artifact
-            );
-            let diff = newScore - prevScore;
-            if (diff > 0) {
-              dfs(current, add, rest - diff, newScore, depth+1);
-            }
-            current[key]--;
-            add[key]--;
-          }
-        }
-
-        const startScore = calcScore(
-          initial.char,
-          initial.equip,
-          initial.skill,
-          initial.beast,
-          initial.artifact
-        );
-
-        dfs(initial, {...increments}, restScore, startScore, 0);
-
-        // 重複排除＆必要スコア以上のみ
-        let filtered = results.filter(r => r.sum >= restScore)
-          .map(r => JSON.stringify(r));
-        // 重複削除
-        filtered = Array.from(new Set(filtered)).map(s => JSON.parse(s));
-
-        // 合計値で昇順ソート
-        filtered.sort((a,b)=>a.sum-b.sum);
-
-        return filtered.slice(0, 10);
-      }
-
-
-      function multiCombinationSplit(restScore, priorityOrder, baseLevels, maxCharLevel, maxDepth=20) {
-        let middleStates = [];
-        // 前半DFS
-        function dfs1(current, add, rest, prevScore, depth) {
-          if (depth === 10) {
-            middleStates.push({current: {...current}, add: {...add}, rest, prevScore});
-            return;
-          }
-          for (let key of priorityOrder) {
-            if (key === "char" && current.char >= maxCharLevel) continue;
-            current[key]++;
-            add[key]++;
-            let newScore = calcScore(
-              current.char,
-              current.equip,
-              current.skill,
-              current.beast,
-              current.artifact
-            );
-            let diff = newScore - prevScore;
-            if (diff > 0) {
-              dfs1(current, add, rest - diff, newScore, depth+1);
-            }
-            current[key]--;
-            add[key]--;
-          }
-        }
+        queue.push({
+          levels: {...baseLevels},
+          adds: {char:0,equip:0,skill:0,beast:0,artifact:0},
+          sum: 0,
+          step: 0
+        });
 
         const startScore = calcScore(
           baseLevels.char,
@@ -382,60 +425,156 @@
           baseLevels.beast,
           baseLevels.artifact
         );
-        dfs1({...baseLevels}, {char:0,equip:0,skill:0,beast:0,artifact:0}, restScore, startScore, 0);
 
-        // 後半DFS
-        let results = [];
-        function dfs2(current, add, rest, prevScore, depth) {
-          if (rest <= 0) {
-            results.push({ ...add, sum: prevScore - startScore });
-            return;
+        while (queue.length > 0 && results.length < maxResult) {
+          const curr = queue.shift();
+
+          if (curr.sum >= restScore) {
+            results.push({...curr.adds, sum: curr.sum});
+            continue;
           }
-          if (depth >= 10) return; // ここは10（10+10=20）
+          if (curr.step >= maxStep) continue;
 
           for (let key of priorityOrder) {
-            if (key === "char" && current.char >= maxCharLevel) continue;
-            current[key]++;
-            add[key]++;
+            if (!enable[key]) continue;
+            if (key === "char" && curr.levels.char >= maxCharLevel) continue;
+            let nextLevels = {...curr.levels};
+            let nextAdds = {...curr.adds};
+            nextLevels[key]++;
+            nextAdds[key]++;
             let newScore = calcScore(
-              current.char,
-              current.equip,
-              current.skill,
-              current.beast,
-              current.artifact
+              nextLevels.char,
+              nextLevels.equip,
+              nextLevels.skill,
+              nextLevels.beast,
+              nextLevels.artifact
             );
-            let diff = newScore - prevScore;
-            if (diff > 0) {
-              dfs2(current, add, rest - diff, newScore, depth+1);
+            let diff = newScore - (startScore + curr.sum);
+
+            if (diff >= 0) {
+              const stateKey = `${nextLevels.char},${nextLevels.equip},${nextLevels.skill},${nextLevels.beast},${nextLevels.artifact},${curr.step+1}`;
+
+              if (!visited.has(stateKey) || visited.get(stateKey) > curr.sum + diff) {
+                visited.set(stateKey, curr.sum + diff);
+                queue.push({
+                  levels: nextLevels,
+                  adds: nextAdds,
+                  sum: curr.sum + diff,
+                  step: curr.step + 1
+                });
+              }
             }
-            current[key]--;
-            add[key]--;
           }
         }
 
-        for (let mid of middleStates) {
-          dfs2(
-            {...mid.current},
-            {...mid.add}, // ←addも引き継ぐ
-            mid.rest,
-            mid.prevScore,
-            0
-          );
-        }
-
-        // 重複排除＆必要スコア以上のみ
-        let filtered = results.filter(r => r.sum >= restScore)
-          .map(r => JSON.stringify(r));
-        filtered = Array.from(new Set(filtered)).map(s => JSON.parse(s));
-
-        filtered.sort((a,b)=>a.sum-b.sum);
-
-        return filtered.slice(0, 10);
+        // results.sort((a,b)=>a.sum-b.sum);
+        results.sort((a, b) => {
+          if (a.sum !== b.sum) return a.sum - b.sum;
+          // ここから優先度順比較
+          for (const key of priorityOrder) {
+            if (b[key] !== a[key]) return b[key] - a[key]; // 多い方を上に
+          }
+          return 0;
+        });
+        return results.slice(0, 10);
       }
 
 
+      // 全探索
+      function multiCombinationBruteForce(
+        restScore, priorityOrder, baseLevels, maxCharLevel, enable) {
+        const results = [];
+        const startScore = calcScore(
+          baseLevels.char,
+          baseLevels.equip,
+          baseLevels.skill,
+          baseLevels.beast,
+          baseLevels.artifact
+        );
 
+        // 上げ幅最大値（例: どれか+10まで許容など調整可能）
+        const MAX_LEVEL = 50;
+        // 強化しない場合はadd範囲を0のみとする
+        const maxAddChar     = Math.min(maxCharLevel - baseLevels.char, 0); // "char"は常に0
+        const maxAddEquip    = enable.equip    ? Math.min(MAX_LEVEL - baseLevels.equip, 50) : 0;
+        const maxAddSkill    = enable.skill    ? Math.min(MAX_LEVEL - baseLevels.skill, 50) : 0;
+        const maxAddBeast    = enable.beast    ? Math.min(MAX_LEVEL - baseLevels.beast, 50) : 0;
+        const maxAddArtifact = enable.artifact ? Math.min(MAX_LEVEL - baseLevels.artifact, 25) : 0;
 
+        for (let addChar = 0; addChar <= maxAddChar; addChar++) {
+          for (let addEquip = 0; addEquip <= maxAddEquip; addEquip++) {
+            for (let addSkill = 0; addSkill <= maxAddSkill; addSkill++) {
+              for (let addBeast = 0; addBeast <= maxAddBeast; addBeast++) {
+                for (let addArtifact = 0; addArtifact <= maxAddArtifact; addArtifact++) {
+
+                  const newScore = calcScore(
+                    baseLevels.char + addChar,
+                    baseLevels.equip + addEquip,
+                    baseLevels.skill + addSkill,
+                    baseLevels.beast + addBeast,
+                    baseLevels.artifact + addArtifact
+                  );
+                  const diff = newScore - startScore;
+
+                  if (diff >= restScore) {
+                    results.push({
+                      char: addChar,
+                      equip: addEquip,
+                      skill: addSkill,
+                      beast: addBeast,
+                      artifact: addArtifact,
+                      sum: diff
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // 優先度降順ソート＋スコア昇順
+        results.sort((a, b) => {
+          // まずスコア（diff, sum）の昇順
+          if (a.sum !== b.sum) return a.sum - b.sum;
+          // スコアが等しい場合はpriorityOrder順に比較
+          for (const key of priorityOrder) {
+            if ((b[key] || 0) !== (a[key] || 0)) {
+              return (b[key] || 0) - (a[key] || 0);
+            }
+          }
+          return 0;
+        });
+        return results.slice(0, 10);
+      }
+
+      function showLoading(show) {
+        const btn = document.getElementById('calcBtn');
+        const text = document.getElementById('calcBtnText');
+        const loader = document.getElementById('calcBtnLoader');
+        if (show) {
+          btn.disabled = true;
+          text.classList.add('hide');
+          loader.classList.remove('hide');
+        } else {
+          btn.disabled = false;
+          text.classList.remove('hide');
+          loader.classList.add('hide');
+        }
+      }
+
+      // 計算ボタン押下時
+      function clickCalcBtn() {
+        showLoading(true);
+        setTimeout(() => {
+          try {
+            calculate();
+          } finally {
+            showLoading(false);
+          }
+        }, 80);
+      }
+
+      // 計算ボタン押下時
       function calculate(){
         const inp = getInputs();
         const priorityOrder = getPriorityOrder();
@@ -447,7 +586,7 @@
         let planScore = calcScore(baseCharLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
         let planPoint = scoreToPoint(planScore);
 
-        let needPoint = inp.targetPoint - planPoint;
+        let needPoint = inp.targetPoint - inp.currentPoint;
         document.getElementById('output').style.display = '';
 
         if (needPoint <= 0) {
@@ -456,10 +595,19 @@
           return;
         }
 
-        let restScore = (inp.targetPoint * DIVISOR) - planScore;
+        let restScore = needPoint * DIVISOR;
         if (restScore <= 0) {
           document.getElementById('output').innerHTML =
             '<b>既に目標原初の星を超えています。</b>';
+          return;
+        }
+
+        const enable = getEnhanceEnable();
+        // 強化項目が一つも選択されていない場合
+        if (Object.values(enable).every(v => !v)) {
+          document.getElementById('output').style.display = '';
+          document.getElementById('output').innerHTML =
+            `<span style="color:#d32f2f;font-weight:bold;">強化項目を1つ以上選択してください。</span>`;
           return;
         }
 
@@ -471,42 +619,65 @@
           artifact: inp.artifactLevel
         };
 
+        // 各種MAXレベル設定
+        function getMaxLevel(key) {
+          if(key === "char") return baseLevels.char;
+          if(enable[key]) return 50; // 強化可
+          else return baseLevels[key]; // 強化不可→現状維持
+        }
+
         // 最大キャラLv制限
         const maxCharLevel = baseCharLevel;
 
-        // 複数案取得
-        let combinations = multiCombination(restScore, priorityOrder, baseLevels, maxCharLevel);
-        if (combinations.length === 0) {
-          combinations = greedyCombination1(restScore, priorityOrder, baseLevels, maxCharLevel);
+        // 強化案取得
+        let combinations = [];
+        if(needPoint < 100){
+          // 全探索は原初の星100未満のみ
+          combinations = multiCombinationBruteForce(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
         }
+        if (combinations.length === 0) {
+          // BruteForceで見つからなかった場合はGreedyとBFSで探索
+          let combinationsB = multiCombinationGreedy(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
+          let combinationsA = multiCombinationBFS(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
+          combinations = [...combinationsB, ...combinationsA];
+        }
+
         // --- 結果の表示 ---
-        let html = `
-          <b>現在原初の星:</b> ${nowPoint}pt<br>
-          <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
-          <b>目標原初の星:</b> ${inp.targetPoint}pt<br>
-          <b>あと${needPoint}原初の星 (${restScore}スコア)必要です。</b><br>
+        // <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
+        html = `
+          目標値まであと原初の星が<b> ${needPoint} (${restScore}pt)</b> 必要です。<br>
           <br>
           <b>優先順位：${priorityOrder.map(k => ELEMENTS.find(e => e.key === k).label).join(' ＞ ')}</b><br>
-          <b>必要な強化組み合わせ例：</b>
-          <ul class="combination-list">
+          <h3>■ 強化組み合わせ例</h3>
+          <label>※固定報酬は考慮していないため、実際の原初の星と異なる場合があります。</label>
         `;
+
+        // テーブルヘッダ作成
+        html += `<table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>No.</th>
+              ${priorityOrder.map(k => `<th>${ELEMENTS.find(e => e.key === k).label}</th>`).join('')}
+              <th>合計スコア</th>
+            </tr>
+          </thead>
+          <tbody>
+        `;
+
         if (combinations.length === 0) {
-          html += '<li>これ以上小さな組み合わせでは達成できません</li>';
+          html += `<tr><td colspan="${priorityOrder.length + 2}">これ以上小さな組み合わせでは達成できません</td></tr>`;
         } else {
           combinations.forEach((c, idx) => {
-            let desc = [];
-            if (c.char) desc.push(`キャラ+${c.char}`);
-            if (c.equip) desc.push(`装備+${c.equip}`);
-            if (c.skill) desc.push(`スキル+${c.skill}`);
-            if (c.artifact) desc.push(`古代遺物+${c.artifact}`);
-            if (c.beast) desc.push(`幻獣+${c.beast}`);
-            html += `<li>${desc.join('，')} （合計スコア+${c.sum}）</li>`;
+            html += `<tr>
+              <td>${idx+1}</td>
+              ${priorityOrder.map(k => `<td>+${c[k]||0}</td>`).join('')}
+              <td>+${c.sum}</td>
+            </tr>`;
           });
         }
-        html += '</ul>';
+        html += '</tbody></table>';
         document.getElementById('output').innerHTML = html;
       }
     </script>
   </body>
 </html>
-
