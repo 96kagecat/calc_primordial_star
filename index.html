@@ -46,6 +46,7 @@
           text-decoration: none;
           font-weight: bold;
           margin-top: 30px;
+          margin-bottom: 30px;
           cursor: pointer;
           border: none;
           min-height: 16px;
@@ -108,7 +109,7 @@
           width: 20px;
           height: 20px;
           accent-color: #007bff;
-          margin-right: 6px;
+          margin-right: 5px;
           vertical-align: middle;
           cursor: pointer;
         }
@@ -146,7 +147,7 @@
           font-weight: bold;
           user-select: none;
           position: relative;
-          min-height: 32px;
+          min-height: 20px;
           display: flex;
           align-items: center;
         }
@@ -364,21 +365,77 @@
           baseLevels.artifact
         );
 
-        // 上げ幅最大値（例: どれか+10まで許容など調整可能）
+        // 上げ幅最大値
         const MAX_LEVEL = 50;
         // 強化しない場合はadd範囲を0のみとする
-        const maxAddChar     = Math.min(maxCharLevel - baseLevels.char, 0); // "char"は常に0
-        const maxAddEquip    = enable.equip    ? Math.min(MAX_LEVEL - baseLevels.equip, 50) : 0;
-        const maxAddSkill    = enable.skill    ? Math.min(MAX_LEVEL - baseLevels.skill, 50) : 0;
-        const maxAddBeast    = enable.beast    ? Math.min(MAX_LEVEL - baseLevels.beast, 50) : 0;
-        const maxAddArtifact = enable.artifact ? Math.min(MAX_LEVEL - baseLevels.artifact, 25) : 0;
+        const maxAddChar     = enable.char     ? Math.min(maxCharLevel - baseLevels.char, MAX_LEVEL) : 0;
+        const maxAddEquip    = enable.equip    ? Math.min(MAX_LEVEL - baseLevels.equip, MAX_LEVEL) : 0;
+        const maxAddSkill    = enable.skill    ? Math.min(MAX_LEVEL - baseLevels.skill, MAX_LEVEL) : 0;
+        const maxAddBeast    = enable.beast    ? Math.min(MAX_LEVEL - baseLevels.beast, MAX_LEVEL) : 0;
+        const maxAddArtifact = enable.artifact ? Math.min(MAX_LEVEL - baseLevels.artifact, MAX_LEVEL) : 0;
 
         for (let addChar = 0; addChar <= maxAddChar; addChar++) {
+          let scoreChar = calcScore(
+            baseLevels.char + addChar,
+            baseLevels.equip,
+            baseLevels.skill,
+            baseLevels.beast,
+            baseLevels.artifact
+          );
+          if (scoreChar - startScore >= restScore) {
+            // 他を増やさなくても達成可能なので記録
+            results.push({
+              char: addChar, equip: 0, skill: 0, beast: 0, artifact: 0,
+              sum: scoreChar - startScore
+            });
+            continue; // 内側不要
+          }
           for (let addEquip = 0; addEquip <= maxAddEquip; addEquip++) {
+            let scoreEquip = calcScore(
+              baseLevels.char + addChar,
+              baseLevels.equip + addEquip,
+              baseLevels.skill,
+              baseLevels.beast,
+              baseLevels.artifact
+            );
+            if (scoreEquip - startScore >= restScore) {
+              results.push({
+                char: addChar, equip: addEquip, skill: 0, beast: 0, artifact: 0,
+                sum: scoreEquip - startScore
+              });
+              continue;
+            }
             for (let addSkill = 0; addSkill <= maxAddSkill; addSkill++) {
+              let scoreSkill = calcScore(
+                baseLevels.char + addChar,
+                baseLevels.equip + addEquip,
+                baseLevels.skill + addSkill,
+                baseLevels.beast,
+                baseLevels.artifact
+              );
+              if (scoreSkill - startScore >= restScore) {
+                results.push({
+                  char: addChar, equip: addEquip, skill: addSkill, beast: 0, artifact: 0,
+                  sum: scoreSkill - startScore
+                });
+                continue;
+              }
               for (let addBeast = 0; addBeast <= maxAddBeast; addBeast++) {
+                let scoreBeast = calcScore(
+                  baseLevels.char + addChar,
+                  baseLevels.equip + addEquip,
+                  baseLevels.skill + addSkill,
+                  baseLevels.beast + addBeast,
+                  baseLevels.artifact
+                );
+                if (scoreBeast - startScore >= restScore) {
+                  results.push({
+                    char: addChar, equip: addEquip, skill: addSkill, beast: addBeast, artifact: 0,
+                    sum: scoreBeast - startScore
+                  });
+                  continue;
+                }
                 for (let addArtifact = 0; addArtifact <= maxAddArtifact; addArtifact++) {
-
                   const newScore = calcScore(
                     baseLevels.char + addChar,
                     baseLevels.equip + addEquip,
@@ -397,13 +454,13 @@
                       artifact: addArtifact,
                       sum: diff
                     });
+                    break;
                   }
                 }
               }
             }
           }
         }
-
         return results;
       }
 
@@ -444,26 +501,27 @@
                 result[key]++;
                 curScore = newScore;
                 improved = true;
-                break; // 優先度順なので一つずつ
+                break;
               } else {
-                currentLevels[key]--; // 戻す
+                currentLevels[key]--;
               }
             }
           }
-          if (!improved) break; // どれも上げられないなら終了
+          // どれも上げられないなら終了
+          if (!improved) break;
         }
 
         result.sum = curScore - startScore;
-        return result; // ←配列でなくオブジェクト単体を返す
+        return result;
       }
 
       // 複数パターンをまとめて返すラッパー関数
       function multiCombinationGreedyVariants(
-        restScore, priorityOrders, baseLevels, maxCharLevel, enable
+        restScore, priorityOrder, baseLevels, maxCharLevel, enable
       ) {
-        // priorityOrdersは配列（複数パターン）
+        const orders = permutations(priorityOrder);
         const results = [];
-        for (const priorityOrder of priorityOrders) {
+        for (const priorityOrder of orders) {
           const r = multiCombinationGreedy(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
           results.push(r);
         }
@@ -534,46 +592,50 @@
         }, 80);
       }
 
+      // メッセージ表示
+      function showOutput(message, color = null, bold = false) {
+        const el = document.getElementById('output');
+        el.style.display = '';
+        let style = '';
+        if (color) style += `color:${color};`;
+        if (bold) style += 'font-weight:bold;';
+        el.innerHTML = `<span style="${style}">${message}</span>`;
+      }
+
       // 計算ボタン押下時
       function calculate(){
         const inp = getInputs();
         const priorityOrder = getPriorityOrder();
 
-        let baseCharLevel = inp.charLevel + inp.charLevelUpPlan;
-        let nowScore = calcScore(inp.charLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
-        let nowPoint = scoreToPoint(nowScore);
+        const baseCharLevel = inp.charLevel + inp.charLevelUpPlan;
+        const nowScore = calcScore(inp.charLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
+        const nowPoint = scoreToPoint(nowScore);
 
-        let planScore = calcScore(baseCharLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
-        let planPoint = scoreToPoint(planScore);
+        const planScore = calcScore(baseCharLevel, inp.equipLevel, inp.skillLevel, inp.beastLevel, inp.artifactLevel);
+        const planPoint = scoreToPoint(planScore);
 
-        let needPoint = inp.targetPoint - inp.currentPoint;
-        document.getElementById('output').style.display = '';
+        const needPoint = inp.targetPoint - inp.currentPoint;
 
+        // 既に達成済み
         if (needPoint <= 0) {
-          document.getElementById('output').innerHTML = `<b>目標原初の星は既に達成済みです！</b><br>
-          (キャラLv上昇予定込みで ${planPoint} 原初の星)`;
+          showOutput('目標原初の星は既に達成済みです。', null, true);
           return;
         }
-        if (needPoint > 500){
-          document.getElementById('output').style.display = '';
-          document.getElementById('output').innerHTML =
-            `<span style="color:#d32f2f;font-weight:bold;">原初の星の差は500以下になるように入力してください。</span>`;
+        // 差が大きすぎる
+        if (needPoint > 500) {
+          showOutput('原初の星の差は500以下になるように入力してください。', '#d32f2f', true);
           return;
         }
-
-        let restScore = needPoint * DIVISOR;
+        const restScore = needPoint * DIVISOR;
+        // スコア超過
         if (restScore <= 0) {
-          document.getElementById('output').innerHTML =
-            '<b>既に目標原初の星を超えています。</b>';
+          showOutput('既に目標原初の星を超えています。', null, true);
           return;
         }
-
         const enable = getEnhanceEnable();
-        // 強化項目が一つも選択されていない場合
+        // 強化項目未選択
         if (Object.values(enable).every(v => !v)) {
-          document.getElementById('output').style.display = '';
-          document.getElementById('output').innerHTML =
-            `<span style="color:#d32f2f;font-weight:bold;">強化項目を1つ以上選択してください。</span>`;
+          showOutput('強化項目を1つ以上選択してください。', '#d32f2f', true);
           return;
         }
 
@@ -597,14 +659,13 @@
 
         // 強化案取得
         let combinations = [];
-        if(needPoint < 200){
-          // 全探索は原初の星100未満のみ
+        if(needPoint <= 200){
+          // 全探索は原初の星200以下のみ
           combinations = multiCombinationBruteForce(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
         }
         if (combinations.length === 0) {
-          // BruteForceで見つからなかった場合はGreedyとBFSで探索
-          const orders = permutations(priorityOrder);
-          combinations = multiCombinationGreedyVariants(restScore, orders, baseLevels, maxCharLevel, enable);
+          // BruteForceで見つからなかった場合はGreedyで探索
+          combinations = multiCombinationGreedyVariants(restScore, priorityOrder, baseLevels, maxCharLevel, enable);
         }
 
         // 結果をソート
@@ -612,12 +673,12 @@
 
         // --- 結果の表示 ---
         // <b>キャラLv上昇予定込み:</b> ${planPoint}pt<br>
-        html = `
+        let html = `
           目標値まであと原初の星が<b> ${needPoint} (${restScore}pt)</b> 必要です。<br>
+          ※実際の原初の星と異なる場合があります。
           <br>
           <b>優先順位：${priorityOrder.map(k => ELEMENTS.find(e => e.key === k).label).join(' ＞ ')}</b><br>
           <h3>■ 強化組み合わせ例</h3>
-          <label>※固定報酬は考慮していないため、実際の原初の星と異なる場合があります。</label>
         `;
 
         // テーブルヘッダ作成
@@ -645,8 +706,8 @@
         }
         html += '</tbody></table>';
         document.getElementById('output').innerHTML = html;
+        document.getElementById('output').style.display = '';
       }
     </script>
   </body>
 </html>
-
